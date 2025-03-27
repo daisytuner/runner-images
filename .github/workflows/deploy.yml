@@ -1,0 +1,54 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  DOCKER_USERNAME: ${{ secrets.DOCKER_HUB_USER }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_HUB_PAT }}
+
+jobs:
+  docker-build-push:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - partition: ./bellis4
+            image: daisytuner/bellis4
+            platform: linux/arm64
+          - partition: ./bellis5
+            image: daisytuner/bellis5
+            platform: linux/arm64
+          - partition: ./tansy
+            image: daisytuner/tansy
+            platform: linux/arm64
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+
+      - name: Extract Tag Name (without 'v')
+        id: extract_tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.partition }}
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            ${{ matrix.image }}:${{ steps.extract_tag.outputs.TAG }}
+            ${{ matrix.image }}:latest
